@@ -10,7 +10,7 @@ subparsers = parser.add_subparsers()
 
 parser.add_argument('-f', '--gurglefile',
                     type=os.path.abspath,
-                    default='gurglefile')
+                    default='gurglefile.py')
 parser.add_argument('-p', '--port', default=7772)
 parser.add_argument('--pidfile',
                     type=os.path.abspath,
@@ -27,14 +27,18 @@ def _command_parser(name, func):
     sp.add_argument('command', nargs='*')
     return sp
 
-parser_run = _command_parser('run', None)
+parser_start = _command_parser('start', None)
+
+parser_stop = _command_parser('stop', None)
+parser_stop.add_argument('--kill', action='store_true', default=False)
 
 parser_status = _sub_parser('status', commands.status)
 
-parser_start = _sub_parser('start', commands.start)
-parser_start.add_argument('--nofork', action='store_true', default=False)
+parser_daemon = _sub_parser('daemon', commands.daemon)
+parser_daemon.add_argument('--nofork', action='store_true', default=False)
 
 parser_terminate = _sub_parser('terminate',  commands.terminate)
+
 
 
 def cli():

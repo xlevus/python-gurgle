@@ -14,7 +14,7 @@ def requires_gurgle(func):
     return _inner
 
 
-def start(args, daemon):
+def daemon(args, daemon):
     if not daemon.status():
         print colour.blue("Starting Gurgle...")
 

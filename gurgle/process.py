@@ -56,23 +56,30 @@ class Process(object):
     def running(self):
         return self.proc is not None
 
+    @property
+    def pid(self):
+        return self.proc.pid if self.proc else None
+
     def run(self):
         logger.info("Running %s", " ".join(self.command))
+
         self.proc = Subprocess(
             self._command,
             stdout=Subprocess.STREAM,
             stderr=Subprocess.STREAM)
 
-        self._read(False, self.proc.stdout)
-        self._read(True, self.proc.stderr)
+        self.proc.set_exit_callback(self._on_exit)
 
-    def _read(self, err, stream):
-        stream.read_until('\n', partial(self._on_read, err, stream))
+    def stop(self, kill=False):
+        proc = self.proc.proc
+        if kill:
+            logger.info("Killing %r [PID %i]", self, self.pid)
+            proc.kill()
+        else:
+            logger.info("Terminating %r [PID %i]", self, self.pid)
+            proc.terminate()
 
-    def _on_read(self, err, stream, data):
-        print "{} | {}".format(self.name, data)
-        self._read(err, stream)
-
-    def _exit(self, exitcode):
+    def _on_exit(self, exitcode):
+        logger.info("Process %r stopped", self)
         self.proc = None
-        self.exitcode = exitcode 
+        self.exitcode = exitcode

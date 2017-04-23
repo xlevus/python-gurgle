@@ -1,6 +1,7 @@
 import os
 import imp
-import logging 
+from functools import wraps
+import logging
 
 import mattdaemon
 
@@ -13,10 +14,58 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-class Command(tornado.web.RequestHandler):
+class Error(Exception):
+    http_status = 400
+
+
+class UnknownProcess(Error):
+    pass
+
+
+class ProcessRunning(Error):
+    pass
+
+
+class ProcessNotRunning(Error):
+    pass
+
+
+def errorhandler(func):
+    @wraps(func)
+    def _inner(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except Error as e:
+            self.set_status(e.http_status)
+            self.write({
+                'error': True,
+                'message': e.message,
+                'type': e.__class__.__name__,
+            })
+    return _inner
+
+
+class ProcessMixin(object):
     @property
     def processes(self):
         return ProcessMeta.PROCESSES
+
+    def get_process(self, name):
+        try:
+            return self.processes[name]
+        except KeyError:
+            raise UnknownProcess(name)
+
+
+class Command(tornado.web.RequestHandler, ProcessMixin):
+
+    @errorhandler
+    def post(self, name):
+        proc = self.get_process(name)
+        self.do_command(proc)
+
+    def do_command(self, process):
+        raise NotImplementedError()
 
 
 class RootHandler(Command):
@@ -24,7 +73,7 @@ class RootHandler(Command):
         self.write("OK\n")
 
 
-class StatusHandler(Command):
+class StatusHandler(tornado.web.RequestHandler, ProcessMixin):
     def get(self):
         output = {}
 
@@ -37,19 +86,30 @@ class StatusHandler(Command):
 
         self.write(output)
 
+
 class RunHandler(Command):
-    def post(self, process):
-        try:
-            proc = self.processes[process]
-            proc.run()
-            self.write({
-                'error': False,
-            })
-        except KeyError:
-            self.set_status(400)
-            self.write({
-                'error': 'Unknown process',
-            })
+    def do_command(self, process):
+        if process.running:
+            raise ProcessRunning(
+                "Process '{0.name}' is already running".format(process))
+
+        process.run()
+
+        self.write({
+            'error': False,
+        })
+
+
+class StopHandler(Command):
+    def do_command(self, process):
+        if not process.running:
+            raise ProcessNotRunning(
+                "Process '{0.name}' is not running".format(process))
+
+        process.stop(kill=self.get_argument('kill', default=False))
+        self.write({
+            'error': False
+        })
 
 
 def get_application(port):
@@ -57,7 +117,8 @@ def get_application(port):
         [
             (r'/', RootHandler),
             (r'/api/status', StatusHandler),
-            (r'/api/([A-Za-z0-9-]+)/run', RunHandler),
+            (r'/api/([A-Za-z0-9-]+)/start', RunHandler),
+            (r'/api/([A-Za-z0-9-]+)/stop', StopHandler),
         ],
         autoreload=False)
     app.listen(port)
