@@ -14,9 +14,9 @@ from .client import ClientError
 def requires_gurgle(func):
     @wraps(func)
     def _inner(args, daemon, client):
-        #if not daemon.status():
-        #    print colour.red("Gurgle is not running.")
-        #    exit(1)
+        if not daemon.status():
+            print colour.red("Gurgle is not running.")
+            exit(1)
         return func(args, daemon, client)
     return _inner
 
@@ -67,7 +67,7 @@ def status(args, daemon, client):
             [name, running, exitcode, pid, " ".join(details['command'])])
 
     print tabulate(table,
-                   ['name', 'status', 'exit', 'pid', 'command'])
+                   ['process', 'status', 'exit', 'pid', 'command'])
 
 
 @gen.coroutine
