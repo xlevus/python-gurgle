@@ -43,3 +43,21 @@ Running
    ```
    $ gurgle watch
    ```
+   
+   
+TODO
+----
+
+ * Python 3 compatibility
+ * Tests
+ * Documentation
+ * Auto-restart
+ * Process healthchecks
+ * Process dependencies
+ * N-Copies of processes
+ * Web UI
+ 
+Known Bugs
+----------
+
+ * `gurgle daemon --nofork` doesn't create a pidfile.
