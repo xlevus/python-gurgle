@@ -1,12 +1,15 @@
 import os
 import imp
+import json
 from functools import wraps
 import logging
 
 import mattdaemon
 
 import tornado.web
+import tornado.websocket
 import tornado.ioloop
+from tornado import gen
 
 from .process import ProcessMeta
 
@@ -32,9 +35,12 @@ class ProcessNotRunning(Error):
 
 def errorhandler(func):
     @wraps(func)
+    @gen.coroutine
     def _inner(self, *args, **kwargs):
         try:
-            return func(self, *args, **kwargs)
+            resp = func(self, *args, **kwargs)
+            if isinstance(resp, gen.Future):
+                yield resp
         except Error as e:
             self.set_status(e.http_status)
             self.write({
@@ -42,6 +48,7 @@ def errorhandler(func):
                 'message': e.message,
                 'type': e.__class__.__name__,
             })
+            self.finish()
     return _inner
 
 
@@ -60,9 +67,12 @@ class ProcessMixin(object):
 class Command(tornado.web.RequestHandler, ProcessMixin):
 
     @errorhandler
+    @gen.coroutine
     def post(self, name):
         proc = self.get_process(name)
-        self.do_command(proc)
+        resp = self.do_command(proc)
+        if isinstance(resp, gen.Future):
+            yield resp
 
     def do_command(self, process):
         raise NotImplementedError()
@@ -102,14 +112,43 @@ class RunHandler(Command):
 
 
 class StopHandler(Command):
+    @gen.coroutine
     def do_command(self, process):
         if not process.running:
             raise ProcessNotRunning(
                 "Process '{0.name}' is not running".format(process))
 
-        process.stop(kill=self.get_argument('kill', default=False))
+        exitcode = yield process.stop(kill=self.get_argument('kill', default=False))
         self.write({
-            'error': False
+            'error': False,
+            'exitcode': exitcode,
+        })
+        self.finish()
+
+
+class StreamHandler(tornado.websocket.WebSocketHandler, ProcessMixin):
+    def open(self):
+        logger.info('Websocket opened')
+
+    def on_message(self, message):
+        logger.debug('WS Message: %r', message)
+        try:
+            msg = json.loads(message)
+            proc = self.get_process(msg['subscribe'])
+            proc.subscribe(self, self._sub)
+        except ValueError as e:
+            logger.debug("Error on message: %r", e)
+            self.close()
+
+    def on_close(self):
+        for proc in self.processes.values():
+            proc.unsubscribe(self)
+
+    def _sub(self, process, stream, message):
+        self.write_message({
+            'process': process.name,
+            'stream': stream,
+            'message': message,
         })
 
 
@@ -120,6 +159,7 @@ def get_application(port):
             (r'/api/status', StatusHandler),
             (r'/api/([A-Za-z0-9-]+)/start', RunHandler),
             (r'/api/([A-Za-z0-9-]+)/stop', StopHandler),
+            (r'/stream.ws', StreamHandler),
         ],
         autoreload=False)
     app.listen(port)

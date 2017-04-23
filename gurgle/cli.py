@@ -38,12 +38,15 @@ parser_start = _command_parser('start', commands.start)
 parser_stop = _command_parser('stop', commands.stop)
 parser_stop.add_argument('--kill', action='store_true', default=False)
 
+parser_listen = _command_parser('listen', commands.listen)
+
 parser_status = _sub_parser('status', commands.status)
 
 parser_daemon = _sub_parser('daemon', commands.daemon)
 parser_daemon.add_argument('--nofork', action='store_true', default=False)
 
 parser_terminate = _sub_parser('terminate',  commands.terminate)
+
 
 
 

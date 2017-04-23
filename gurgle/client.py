@@ -3,6 +3,8 @@ from functools import partial
 
 from tornado import gen
 from tornado import httpclient
+from tornado import websocket
+from tornado import queues
 
 
 class ClientError(Exception):
@@ -19,10 +21,13 @@ class Client(object):
         self.port = port
         self.client = httpclient.AsyncHTTPClient()
 
+    def _url(self, path):
+        return 'http://localhost:{}{}'.format(self.port, path)
+
     @gen.coroutine
     def _request(self, method, path, **kwargs):
         req = httpclient.HTTPRequest(
-            url='http://localhost:{}{}'.format(self.port, path),
+            url=self._url(path),
             body='' if method == 'POST' else None,
             method=method)
 
@@ -55,3 +60,27 @@ class Client(object):
 
     def status(self):
         return self._request('GET', '/api/status')
+
+    @gen.coroutine
+    def _listen(self, queue, conn):
+        while True:
+            msg = yield conn.read_message()
+            if msg is None:
+                break
+
+            data = json.loads(msg)
+            yield queue.put(data)
+
+    @gen.coroutine
+    def listen(self, processes):
+        conn = yield websocket.websocket_connect(
+            'ws://localhost:{}/stream.ws'.format(self.port))
+
+        for p in processes:
+            print "Subscribing to", p
+            conn.write_message(json.dumps({
+                'subscribe': p
+            }))
+
+        queue = queues.Queue()
+        raise gen.Return((queue, self._listen(queue, conn)))

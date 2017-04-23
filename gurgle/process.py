@@ -1,6 +1,10 @@
 import shlex
 from functools import partial
+
+from tornado import gen
 from tornado.process import Subprocess
+from tornado import ioloop
+from tornado import iostream
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,6 +33,7 @@ class Process(object):
 
         self.proc = None
         self.exitcode = None
+        self.subs = {}
 
     def __repr__(self):
         return "<Process({}): {}>".format(
@@ -69,6 +74,8 @@ class Process(object):
             stderr=Subprocess.STREAM)
 
         self.proc.set_exit_callback(self._on_exit)
+        self._start_read('stdout', self.proc.stdout)
+        self._start_read('stderr', self.proc.stderr)
 
     def stop(self, kill=False):
         proc = self.proc.proc
@@ -79,7 +86,35 @@ class Process(object):
             logger.info("Terminating %r [PID %i]", self, self.pid)
             proc.terminate()
 
+        return self.proc.wait_for_exit(raise_error=False)
+
+    def subscribe(self, id, cb):
+        logger.info("Subscription: %r added", id)
+        self.subs[id] = cb
+
+    def unsubscribe(self, id):
+        try:
+            del self.subs[id]
+            logger.info("Subscription: %r removed", id)
+        except KeyError:
+            pass
+
     def _on_exit(self, exitcode):
         logger.info("Process %r stopped", self)
         self.proc = None
         self.exitcode = exitcode
+        self.subs = {}
+
+    def _start_read(self, label, stream):
+        loop = ioloop.IOLoop.current()
+        loop.add_future(self._read(label, stream), lambda f: f)
+
+    @gen.coroutine
+    def _read(self, label, stream):
+        try:
+            while self.running:
+                msg = yield stream.read_until('\n')
+                for sub_cb in self.subs.itervalues():
+                    sub_cb(self, label, msg)
+        except iostream.StreamClosedError:
+            pass

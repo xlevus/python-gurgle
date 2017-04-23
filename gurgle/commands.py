@@ -1,4 +1,5 @@
-import sys 
+import sys
+from itertools import cycle
 from functools import wraps
 
 from tabulate import tabulate
@@ -13,9 +14,9 @@ from .client import ClientError
 def requires_gurgle(func):
     @wraps(func)
     def _inner(args, daemon, client):
-        if not daemon.status():
-            print colour.red("Gurgle is not running.")
-            exit(1)
+        #if not daemon.status():
+        #    print colour.red("Gurgle is not running.")
+        #    exit(1)
         return func(args, daemon, client)
     return _inner
 
@@ -116,3 +117,37 @@ def stop(args, daemon, client):
 
     if error:
         exit(1)
+
+
+@requires_gurgle
+@gen.coroutine
+def listen(args, daemon, client):
+    names = args.process
+    if not names:
+        names = yield all_processes(client)
+
+    colour_map = dict(zip(
+        names,
+        cycle([colour.blue, colour.green, colour.cyan,
+               colour.purple, colour.yellow, colour.light_grey,
+               colour.dark_grey])))
+
+    padding = max((len(x) for x in names))
+
+    queue, fut = yield client.listen(names)
+    loop = tornado.ioloop.IOLoop.current()
+    loop.add_future(fut, lambda f: f)
+
+    while fut.running():
+        msg = yield queue.get()
+
+        proc = msg['process']
+        proc_c = colour_map[proc]
+
+        if msg['stream'] == 'stderr':
+            msg_c = colour.red
+        else:
+            msg_c = lambda x: x
+
+        print proc_c(proc.rjust(padding)), '|', msg_c(msg['message'].rstrip())
+
