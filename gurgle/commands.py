@@ -68,19 +68,29 @@ def status(args, daemon, client):
                    ['name', 'status', 'exit', 'pid'])
 
 
+@gen.coroutine
+def all_processes(client):
+    data = yield client.status()
+    raise gen.Return(data.keys())
+
+
 @requires_gurgle
 @gen.coroutine
 def start(args, daemon, client):
     error = False
 
-    for name in args.process:
+    names = args.process
+    if not names:
+        names = yield all_processes(client)
+
+    for name in names:
         try:
             data = yield client.start(name)
         except ClientError as e:
-            print "ERROR", colour.red(name), e.type
+            print colour.red("ERROR"), colour.bold_red(name), e.type
             error = True
         else:
-            print "OK", colour.green(name)
+            print colour.green("OK"), colour.bold_green(name)
 
     if error:
         exit(1)
@@ -91,7 +101,11 @@ def start(args, daemon, client):
 def stop(args, daemon, client):
     error = False
 
-    for name in args.process:
+    names = args.process
+    if not names:
+        names = yield all_processes(client)
+
+    for name in names:
         try:
             data = yield client.stop(name, kill=args.kill)
         except ClientError as e:
