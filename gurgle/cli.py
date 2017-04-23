@@ -30,12 +30,12 @@ def _sub_parser(name, func):
 
 def _command_parser(name, func):
     sp = _sub_parser(name, func)
-    sp.add_argument('command', nargs='*')
+    sp.add_argument('process', nargs='*')
     return sp
 
-parser_start = _command_parser('start', None)
+parser_start = _command_parser('start', commands.start)
 
-parser_stop = _command_parser('stop', None)
+parser_stop = _command_parser('stop', commands.stop)
 parser_stop.add_argument('--kill', action='store_true', default=False)
 
 parser_status = _sub_parser('status', commands.status)
@@ -45,6 +45,11 @@ parser_daemon.add_argument('--nofork', action='store_true', default=False)
 
 parser_terminate = _sub_parser('terminate',  commands.terminate)
 
+
+
+def _finish(future):
+    loop = IOLoop.current().stop()
+    return future.result()
 
 
 def cli():
@@ -63,5 +68,5 @@ def cli():
 
     if isinstance(resp, Future):
         loop = IOLoop.current()
-        loop.add_future(resp, lambda f: loop.stop())
+        loop.add_future(resp, _finish)
         loop.start()

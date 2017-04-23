@@ -7,6 +7,8 @@ from colours import colour
 import tornado.ioloop
 from tornado import gen
 
+from .client import ClientError
+
 
 def requires_gurgle(func):
     @wraps(func)
@@ -41,7 +43,7 @@ def terminate(args, daemon, client):
 
 
 @requires_gurgle
-@gen.coroutine 
+@gen.coroutine
 def status(args, daemon, client):
     data = yield client.status()
     table = []
@@ -63,5 +65,40 @@ def status(args, daemon, client):
         table.append([name, running, exitcode, pid])
 
     print tabulate(table,
-                   ['name', 'running', 'exit', 'pid'])
+                   ['name', 'status', 'exit', 'pid'])
 
+
+@requires_gurgle
+@gen.coroutine
+def start(args, daemon, client):
+    error = False
+
+    for name in args.process:
+        try:
+            data = yield client.start(name)
+        except ClientError as e:
+            print "ERROR", colour.red(name), e.type
+            error = True
+        else:
+            print "OK", colour.green(name)
+
+    if error:
+        exit(1)
+
+
+@requires_gurgle
+@gen.coroutine
+def stop(args, daemon, client):
+    error = False
+
+    for name in args.process:
+        try:
+            data = yield client.stop(name, kill=args.kill)
+        except ClientError as e:
+            print colour.red("ERROR"), colour.bold_red(name), e.type
+            error = True
+        else:
+            print colour.green("OK"), colour.bold_green(name)
+
+    if error:
+        exit(1)
