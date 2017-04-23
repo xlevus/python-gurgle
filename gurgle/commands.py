@@ -1,3 +1,4 @@
+import sys 
 from functools import wraps
 
 from colours import colour
@@ -16,6 +17,12 @@ def requires_gurgle(func):
 def start(args, daemon):
     if not daemon.status():
         print colour.blue("Starting Gurgle...")
+
+        if args.nofork:
+            daemon.should_daemonize = False
+            daemon.stdout = sys.stdout
+            daemon.stderr = sys.stderr
+
         daemon.start(
             gurglefile=args.gurglefile,
             port=args.port)

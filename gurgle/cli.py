@@ -15,7 +15,6 @@ parser.add_argument('-p', '--port', default=7772)
 parser.add_argument('--pidfile',
                     type=os.path.abspath,
                     default=None)
-parser.add_argument('--nofork', action='store_true', default=False)
 
 
 def _sub_parser(name, func):
@@ -33,6 +32,8 @@ parser_run = _command_parser('run', None)
 parser_status = _sub_parser('status', commands.status)
 
 parser_start = _sub_parser('start', commands.start)
+parser_start.add_argument('--nofork', action='store_true', default=False)
+
 parser_terminate = _sub_parser('terminate',  commands.terminate)
 
 
@@ -45,16 +46,7 @@ def cli():
             os.path.dirname(args.gurglefile),
             '.gurgle.pid')
 
-    if args.nofork:
-        kwargs = {
-            'daemonize': False,
-            'stdout': sys.stdout,
-            'stderr': sys.stderr,
-        }
-    else:
-        kwargs = {
-            'daemonize': True,
-        }
+    kwargs = {}
     daemon = Daemon(pidfile, **kwargs)
 
     args.func(args, daemon)

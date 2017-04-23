@@ -66,10 +66,7 @@ class Process(object):
         self._read(False, self.proc.stdout)
         self._read(True, self.proc.stderr)
 
-        return proc
-
     def _read(self, err, stream):
-        logger.info("Reading next line from %r", stream)
         stream.read_until('\n', partial(self._on_read, err, stream))
 
     def _on_read(self, err, stream, data):

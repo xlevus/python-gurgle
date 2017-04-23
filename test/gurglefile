@@ -4,7 +4,7 @@ from gurgle import Process
 
 
 class Repeater(Process):
-    command = ['./test/repeat', '{name}', '1']
+    command = ['./repeat', '{name}', '1']
 
 
 ying = Repeater('ying')
