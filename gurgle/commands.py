@@ -63,10 +63,11 @@ def status(args, daemon, client):
         exitcode = (details['exitcode'] or '')
         pid = (details['pid'] or '')
 
-        table.append([name, running, exitcode, pid])
+        table.append(
+            [name, running, exitcode, pid, " ".join(details['command'])])
 
     print tabulate(table,
-                   ['name', 'status', 'exit', 'pid'])
+                   ['name', 'status', 'exit', 'pid', 'command'])
 
 
 @gen.coroutine
