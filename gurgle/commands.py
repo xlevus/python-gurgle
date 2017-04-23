@@ -1,20 +1,24 @@
 import sys 
 from functools import wraps
 
+from tabulate import tabulate
 from colours import colour
+
+import tornado.ioloop
+from tornado import gen
 
 
 def requires_gurgle(func):
     @wraps(func)
-    def _inner(args, daemon):
+    def _inner(args, daemon, client):
         if not daemon.status():
             print colour.red("Gurgle is not running.")
             exit(1)
-        return func(args, daemon)
+        return func(args, daemon, client)
     return _inner
 
 
-def daemon(args, daemon):
+def daemon(args, daemon, client):
     if not daemon.status():
         print colour.blue("Starting Gurgle...")
 
@@ -31,11 +35,33 @@ def daemon(args, daemon):
 
 
 @requires_gurgle
-def terminate(args, daemon):
+def terminate(args, daemon, client):
     print colour.blue("Terminating Gurgle...")
     daemon.stop()
 
 
 @requires_gurgle
-def status(args, daemon):
-    pass
+@gen.coroutine 
+def status(args, daemon, client):
+    data = yield client.status()
+    table = []
+
+    for name, details in sorted(data.items()):
+        if details['running']:
+            name = colour.bold_green(name)
+        elif details['exitcode'] in (0, None):
+            name = colour.yellow(name)
+        else:
+            name = colour.bold_red(name)
+
+        running=(colour.green('RUNNING')
+                 if details['running'] else colour.red('STOPPED'))
+
+        exitcode = (details['exitcode'] or '')
+        pid = (details['pid'] or '')
+
+        table.append([name, running, exitcode, pid])
+
+    print tabulate(table,
+                   ['name', 'running', 'exit', 'pid'])
+

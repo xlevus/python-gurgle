@@ -9,7 +9,7 @@ setup(
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python :: 2.7,'],
-    install_requires=["tornado"],
+    install_requires=["tornado", "mattdaemon", "tabulate", "colours"],
     entry_points={
         'console_scripts': [
             'gurgle=gurgle.cli:cli',]})

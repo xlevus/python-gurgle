@@ -4,6 +4,12 @@ import argparse
 
 from . import commands
 from .server import Daemon
+from .client import Client
+
+from tornado.concurrent import Future
+from tornado.ioloop import IOLoop
+from tornado.gen import coroutine
+
 
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
@@ -50,7 +56,12 @@ def cli():
             os.path.dirname(args.gurglefile),
             '.gurgle.pid')
 
-    kwargs = {}
-    daemon = Daemon(pidfile, **kwargs)
+    daemon = Daemon(pidfile)
+    client = Client(args.port)
 
-    args.func(args, daemon)
+    resp = args.func(args, daemon, client)
+
+    if isinstance(resp, Future):
+        loop = IOLoop.current()
+        loop.add_future(resp, lambda f: loop.stop())
+        loop.start()

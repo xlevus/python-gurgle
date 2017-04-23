@@ -80,6 +80,7 @@ class StatusHandler(tornado.web.RequestHandler, ProcessMixin):
         for name, process in self.processes.iteritems():
             output[name] = {
                 'running': process.running,
+                'pid': process.pid,
                 'command': process._command,
                 'exitcode': process.exitcode,
             }
