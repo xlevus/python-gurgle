@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 class ProcessMeta(type):
     PROCESSES = {}
 
-    def __call__(cls, name, **kwargs):
+    def __call__(cls, name, *args, **kwargs):
         if name in ProcessMeta.PROCESSES:
             raise RuntimeError("Duplicate process '{}'".format(name))
 
-        inst = type.__call__(cls, name, kwargs)
+        inst = type.__call__(cls, name, *args, **kwargs)
         ProcessMeta.PROCESSES[name] = inst
         return inst
 
@@ -27,7 +27,7 @@ class Process(object):
 
     command = []
 
-    def __init__(self, name, kwargs):
+    def __init__(self, name, **kwargs):
         self.name = name
         self.kwargs = kwargs
 
