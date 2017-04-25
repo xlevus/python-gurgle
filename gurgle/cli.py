@@ -119,6 +119,7 @@ def cli():
     args.daemon = server.get_daemon(root, args.listen, args.fork)
 
     if not args.daemon.status():
+        print colour.blue("Starting gurgle...")
         args.daemon.start()
 
     resp = args.func(args)
