@@ -1,4 +1,6 @@
+import os
 import shlex
+import contextlib
 from functools import partial
 
 from tornado import gen
@@ -22,14 +24,71 @@ class ProcessMeta(type):
         return inst
 
 
+class CommandMixin(object):
+    def command_prefix(self):
+        return []
+
+    def command_suffix(self):
+        return []
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *_):
+        pass
+
+
+class Argument(CommandMixin):
+    def __init__(self, *args):
+        self.args = args
+
+    def __repr__(self):
+        return "<Args: {}>".format(" ".join(self.args))
+
+    def command_suffix(self):
+        return list(self.args)
+
+
+class Environ(CommandMixin):
+    def __init__(self, *args, **kwargs):
+        self.environ = dict(args, **kwargs)
+
+    def __repr__(self):
+        return "<Environ: {}>".format(" ".join(self.environ,keys()))
+
+    def __enter__(self):
+        self._original_state = {}
+        for key in self.environ:
+            if key in os.environ:
+                self._original_state[key] = os.environ[key]
+            os.environ[key] = self.environ[key]
+
+    def __exit__(self, *_):
+        for key in self.environ:
+            if key in self._original_state:
+                os.environ[key] = self._original_state
+            else:
+                del os.environ[key]
+        del self._original_state
+
+
+class Wrapper(CommandMixin):
+    def __init__(self, *args):
+        self.prefix = args
+
+    def command_prefix(self):
+        return list(self.prefix)
+
+
 class Process(object):
     __metaclass__ = ProcessMeta
 
     command = []
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, *mixins, **kwargs):
         self.name = name
         self.kwargs = kwargs
+        self.mixins = mixins
 
         self.proc = None
         self.exitcode = None
@@ -38,17 +97,22 @@ class Process(object):
     def __repr__(self):
         return "<Process({}): {}>".format(
             self.name,
-            " ".join(self._command))
+            " ".join(self.format_command()))
 
-    @property
-    def _vars(self):
+    def __str__(self):
+        return self.name
+
+    def command_vars(self):
         return dict(name=self.name, **self.kwargs)
 
-    @property
-    def _command(self):
-        _vars = self._vars
+    def format_command(self):
+        _vars = self.command_vars()
 
         cmd = self.command[:]
+
+        for mixin in self.mixins:
+            cmd = mixin.command_prefix() + cmd + mixin.command_suffix()
+
         if isinstance(cmd, (str, unicode)):
             cmd = shlex.split(cmd)
 
@@ -68,10 +132,11 @@ class Process(object):
     def run(self):
         logger.info("Running %s", " ".join(self.command))
 
-        self.proc = Subprocess(
-            self._command,
-            stdout=Subprocess.STREAM,
-            stderr=Subprocess.STREAM)
+        with contextlib.nested(*self.mixins):
+            self.proc = Subprocess(
+                self.format_command(),
+                stdout=Subprocess.STREAM,
+                stderr=Subprocess.STREAM)
 
         self._exit_future = self._wait_for_exit()
         self._start_read('stdout', self.proc.stdout)

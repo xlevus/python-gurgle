@@ -1,11 +1,13 @@
 import os
 import sys
 import argparse
+import traceback
 from colours import colour
 
 from . import commands
 from .server import Daemon
 from .client import Client
+from .util import load_gurglefile
 
 from tornado.concurrent import Future
 from tornado.ioloop import IOLoop
@@ -83,6 +85,15 @@ def cli():
     if not os.path.exists(args.gurglefile):
         print colour.red('Cannot find {}'.format(args.gurglefile))
         exit(1)
+
+    try:
+        load_gurglefile(args.gurglefile)
+    except:
+        print colour.red("There was an error loading '{}'".format(
+            args.gurglefile))
+        traceback.print_exc()
+        exit(1)
+
 
     pidfile = args.pidfile
     if not args.pidfile:

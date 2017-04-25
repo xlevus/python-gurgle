@@ -91,7 +91,7 @@ class StatusHandler(tornado.web.RequestHandler, ProcessMixin):
             output[name] = {
                 'running': process.running,
                 'pid': process.pid,
-                'command': process._command,
+                'command': process.format_command(),
                 'exitcode': process.exitcode,
             }
 
@@ -174,16 +174,7 @@ class Daemon(mattdaemon.daemon):
         gurglefile = kwargs.pop('gurglefile')
         port = kwargs.pop('port')
 
-        self._load_gurglefile(gurglefile)
-
         app = get_application(port)
 
         tornado.ioloop.IOLoop.current().start()
 
-    def _load_gurglefile(self, gurglefile):
-        wd = os.path.dirname(gurglefile)
-        os.chdir(wd)
-        logger.debug('Changed working directory to %r', os.getcwd())
-
-        logger.debug('Loading %r', gurglefile)
-        module = imp.load_source('gurglefile', gurglefile)

@@ -4,6 +4,10 @@ MESSAGE=$1
 SLEEP=$2
 
 while true; do
-    echo $MESSAGE
+    if [ -z ${STRING+X} ]; then
+        echo $MESSAGE
+    else
+        echo $STRING
+    fi
     sleep $SLEEP
 done
