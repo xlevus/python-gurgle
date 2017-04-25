@@ -118,7 +118,9 @@ class StopHandler(Command):
             raise ProcessNotRunning(
                 "Process '{0.name}' is not running".format(process))
 
-        exitcode = yield process.stop(kill=self.get_argument('kill', default=False))
+        exitcode = yield process.stop(
+            kill=self.get_argument('kill', default=False))
+
         self.write({
             'error': False,
             'exitcode': exitcode,

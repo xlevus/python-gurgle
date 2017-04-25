@@ -73,10 +73,11 @@ class Process(object):
             stdout=Subprocess.STREAM,
             stderr=Subprocess.STREAM)
 
-        self.proc.set_exit_callback(self._on_exit)
+        self._exit_future = self._wait_for_exit()
         self._start_read('stdout', self.proc.stdout)
         self._start_read('stderr', self.proc.stderr)
 
+    @gen.coroutine
     def stop(self, kill=False):
         proc = self.proc.proc
         if kill:
@@ -86,7 +87,8 @@ class Process(object):
             logger.info("Terminating %r [PID %i]", self, self.pid)
             proc.terminate()
 
-        return self.proc.wait_for_exit(raise_error=False)
+        exitcode = yield self._exit_future
+        raise gen.Return(exitcode)
 
     def subscribe(self, id, cb):
         logger.info("Subscription: %r added", id)
@@ -99,11 +101,14 @@ class Process(object):
         except KeyError:
             pass
 
-    def _on_exit(self, exitcode):
+    @gen.coroutine
+    def _wait_for_exit(self):
+        exitcode = yield self.proc.wait_for_exit(False)
         logger.info("Process %r stopped", self)
         self.proc = None
         self.exitcode = exitcode
         self.subs = {}
+        raise gen.Return(exitcode)
 
     def _start_read(self, label, stream):
         loop = ioloop.IOLoop.current()
