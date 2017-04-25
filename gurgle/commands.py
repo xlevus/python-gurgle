@@ -63,8 +63,12 @@ def status(args, daemon, client):
         exitcode = (details['exitcode'] or '')
         pid = (details['pid'] or '')
 
+        command = ' '.join(details['command'])
+        if len(command) > 80:
+            command = command[:77] + '...'
+
         table.append(
-            [name, running, exitcode, pid, " ".join(details['command'])])
+            [name, running, exitcode, pid, command])
 
     print tabulate(table,
                    ['process', 'status', 'exit', 'pid', 'command'])
