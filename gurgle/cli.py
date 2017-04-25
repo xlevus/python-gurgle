@@ -5,8 +5,8 @@ import traceback
 from colours import colour
 
 from . import commands
-from .server import Daemon
-from .client import Client
+from . import server
+from . import client
 from .util import load_gurglefile
 
 from tornado.concurrent import Future
@@ -17,23 +17,31 @@ from tornado.gen import coroutine
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers()
 
+
+def _host_port(arg):
+    host, port = arg.split(':')
+
+    host = host or None
+    port = int(port or 7774)
+
+    return host, port
+
+
 parser.add_argument(
     '-f',
     dest='gurglefile', metavar='FILE',
     type=os.path.abspath, default='gurglefile.py',
-    help='Path to the gurglefile. Defaults to `./gurglefile.py`.')
+    help='Path to the gurglefile. Defaults to `./gurglefile.py`')
 
 parser.add_argument(
-    '-p', '--port', default=7772,
-    help='Port for the gurgle daemon to listen on. Defaults to 7772.')
-
-parser.add_argument(
-    '--pidfile', default=None,
-    help='Path to the gurgle daemon pidfile. Defaults to `./.gurgle.pid`.')
+    '-l', '--listen', nargs='?', metavar='HOST:PORT',
+    type=_host_port, default=('127.0.0.1', 7772),
+    help=':port or host:port to expose (or connect) via a hostname.')
 
 parser.add_argument(
     '--nofork',
-    action='store_true', default=False,
+    dest='fork',
+    action='store_false', default=True,
     help='Do not fork to the background.')
 
 
@@ -79,32 +87,41 @@ def _finish(future):
     return future.result()
 
 
-def cli():
-    args = parser.parse_args()
+def _find_gfile(args):
+    g_file = args.gurglefile
 
-    if not os.path.exists(args.gurglefile):
-        print colour.red('Cannot find {}'.format(args.gurglefile))
+    if os.path.isdir(g_file):
+        g_file = os.path.join(g_file, 'gurglefile.py')
+
+    if not os.path.exists(g_file):
+        print colour.red('Cannot find {}'.format(g_file))
         exit(1)
 
     try:
-        load_gurglefile(args.gurglefile)
+        load_gurglefile(g_file)
     except:
         print colour.red("There was an error loading '{}'".format(
-            args.gurglefile))
+            g_file))
         traceback.print_exc()
         exit(1)
 
+    root = os.path.dirname(g_file)
 
-    pidfile = args.pidfile
-    if not args.pidfile:
-        pidfile = os.path.join(
-            os.path.dirname(args.gurglefile),
-            '.gurgle.pid')
+    return root, g_file
 
-    daemon = Daemon(pidfile)
-    client = Client(args.port)
 
-    resp = args.func(args, daemon, client)
+def cli():
+    args = parser.parse_args()
+
+    root, g_file = _find_gfile(args)
+
+    args.client = client.Client(*args.listen)
+    args.daemon = server.get_daemon(root, args.listen, args.fork)
+
+    if not args.daemon.status():
+        args.daemon.start()
+
+    resp = args.func(args)
 
     if isinstance(resp, Future):
         loop = IOLoop.current()

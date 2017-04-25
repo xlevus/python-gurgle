@@ -17,7 +17,7 @@ class ClientError(Exception):
 
 
 class Client(object):
-    def __init__(self, port):
+    def __init__(self, host, port):
         self.port = port
         self.client = httpclient.AsyncHTTPClient()
 

@@ -1,15 +1,16 @@
 import os
-import imp
+import sys
 import json
 from functools import wraps
 import logging
 
-import mattdaemon
-
 import tornado.web
-import tornado.websocket
 import tornado.ioloop
+import tornado.websocket
+import tornado.httpserver
 from tornado import gen
+
+import mattdaemon
 
 from .process import ProcessMeta
 
@@ -154,7 +155,7 @@ class StreamHandler(tornado.websocket.WebSocketHandler, ProcessMixin):
         })
 
 
-def get_application(port):
+def get_application():
     app = tornado.web.Application(
         [
             (r'/', RootHandler),
@@ -164,17 +165,39 @@ def get_application(port):
             (r'/stream.ws', StreamHandler),
         ],
         autoreload=False)
-    app.listen(port)
     return app
 
 
 
+def start_server(listen):
+    app = get_application()
+    server = tornado.httpserver.HTTPServer(app)
+    host, port = listen
+    server.listen(port, address=host)
+    tornado.ioloop.IOLoop.current().start()
+
+
 class Daemon(mattdaemon.daemon):
+    def __init__(self, pidfile, daemonize=True, **kwargs):
+        mattdaemon.daemon.__init__(self, pidfile, daemonize=daemonize)
+
+        if not daemonize:
+            self.stdout = sys.stdout
+            self.stderr = sys.stderr
+
+        self.kwargs = kwargs
+
+    def start(self, *args, **kwargs):
+        kwargs.update(self.kwargs)
+        mattdaemon.daemon.start(self, *args, **kwargs)
+
     def run(self, *args, **kwargs):
-        gurglefile = kwargs.pop('gurglefile')
-        port = kwargs.pop('port')
+        root = kwargs.pop('root')
+        listen = kwargs.pop('listen')
+        os.chdir(root)
+        start_server(listen)
 
-        app = get_application(port)
 
-        tornado.ioloop.IOLoop.current().start()
-
+def get_daemon(root, listen, fork):
+    pidfile = os.path.join(root, '.gurgle.pid')
+    return Daemon(pidfile, daemonize=fork, root=root, listen=listen)

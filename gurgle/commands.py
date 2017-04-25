@@ -11,18 +11,8 @@ from tornado import gen
 from .client import ClientError
 
 
-def requires_gurgle(func):
-    @wraps(func)
-    def _inner(args, daemon, client):
-        if not args.nofork and not daemon.status():
-            print colour.red("Gurgle is not running.")
-            exit(1)
-        return func(args, daemon, client)
-    return _inner
-
-
-def daemon(args, daemon, client):
-    if not daemon.status():
+def daemon(args):
+    if not args.daemon.status():
         print colour.blue("Starting Gurgle...")
 
         if args.nofork:
@@ -37,16 +27,14 @@ def daemon(args, daemon, client):
         print colour.red("Gurgle is already running.")
 
 
-@requires_gurgle
-def terminate(args, daemon, client):
+def terminate(args):
     print colour.blue("Terminating Gurgle...")
-    daemon.stop()
+    args.daemon.stop()
 
 
-@requires_gurgle
 @gen.coroutine
-def status(args, daemon, client):
-    data = yield client.status()
+def status(args):
+    data = yield args.client.status()
     table = []
 
     for name, details in sorted(data.items()):
@@ -80,18 +68,17 @@ def all_processes(client):
     raise gen.Return(data.keys())
 
 
-@requires_gurgle
 @gen.coroutine
-def start(args, daemon, client):
+def start(args):
     error = False
 
     names = args.process
     if not names:
-        names = yield all_processes(client)
+        names = yield all_processes(args.client)
 
     for name in names:
         try:
-            data = yield client.start(name)
+            data = yield args.client.start(name)
         except ClientError as e:
             print colour.red("ERROR"), colour.bold_red(name), e.type
             error = True
@@ -102,18 +89,17 @@ def start(args, daemon, client):
         exit(1)
 
 
-@requires_gurgle
 @gen.coroutine
-def stop(args, daemon, client):
+def stop(args):
     error = False
 
     names = args.process
     if not names:
-        names = yield all_processes(client)
+        names = yield all_processes(args.client)
 
     for name in names:
         try:
-            data = yield client.stop(name, kill=args.kill)
+            data = yield args.client.stop(name, kill=args.kill)
         except ClientError as e:
             print colour.red("ERROR"), colour.bold_red(name), e.type
             error = True
@@ -124,12 +110,11 @@ def stop(args, daemon, client):
         exit(1)
 
 
-@requires_gurgle
 @gen.coroutine
-def listen(args, daemon, client):
+def listen(args):
     names = args.process
     if not names:
-        names = yield all_processes(client)
+        names = yield all_processes(args.client)
 
     colour_map = dict(zip(
         names,
@@ -139,7 +124,7 @@ def listen(args, daemon, client):
 
     padding = max((len(x) for x in names))
 
-    queue, fut = yield client.listen(names)
+    queue, fut = yield args.client.listen(names)
     loop = tornado.ioloop.IOLoop.current()
     loop.add_future(fut, lambda f: f)
 
