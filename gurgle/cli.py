@@ -29,6 +29,11 @@ parser.add_argument(
     '--pidfile', default=None,
     help='Path to the gurgle daemon pidfile. Defaults to `./.gurgle.pid`.')
 
+parser.add_argument(
+    '--nofork',
+    action='store_true', default=False,
+    help='Do not fork to the background.')
+
 
 def _sub_parser(name, func, help=''):
     sp = subparsers.add_parser(name, help=help)
@@ -61,7 +66,6 @@ parser_status = _sub_parser(
 parser_daemon = _sub_parser(
     'daemon', commands.daemon,
     'Start the gurgle dameon.')
-parser_daemon.add_argument('--nofork', action='store_true', default=False)
 
 parser_terminate = _sub_parser(
     'terminate',  commands.terminate,

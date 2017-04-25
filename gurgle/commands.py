@@ -14,7 +14,7 @@ from .client import ClientError
 def requires_gurgle(func):
     @wraps(func)
     def _inner(args, daemon, client):
-        if not daemon.status():
+        if not args.nofork and not daemon.status():
             print colour.red("Gurgle is not running.")
             exit(1)
         return func(args, daemon, client)
