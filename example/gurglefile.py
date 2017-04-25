@@ -6,16 +6,20 @@ class Repeater(Process):
 
 
 # keyword arguments are formatted into the command
-ying = Repeater('ying', delay=1)
-yang = Repeater('yang', delay=1)
+Repeater('ying', delay=1)
+Repeater('yang', delay=1)
 
 # Environ objects passed in through args set env vars in the process
-envion = Repeater('environ', Environ(STRING='FAST'), delay=0.1)
+Repeater('environ', Environ(STRING='FAST'), delay=0.1)
 
 
 # Argument objects passed in through args append to the command
-arg = Repeater('arg', Argument('--test'), delay=1)
+Repeater('arg', Argument('--test'), delay=1)
 
 
 # Wrapper objects passed in through args prefix the command
-arg = Repeater('wrapper', Wrapper('echo'), delay=1)
+Repeater('wrapper', Wrapper('echo'), delay=1)
+
+
+# You don't even need to define a process class
+Process('no_class', Argument('echo', 'Hello', 'World'))
